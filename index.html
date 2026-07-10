@@ -343,9 +343,8 @@ function loadHistory() {
   catch(e) { return []; }
 }
 function saveHistory(records) {
-  const arr = records.slice(-20);
-  localStorage.setItem('invoice_history', JSON.stringify(arr));
-  renderHistory(arr);
+  localStorage.setItem('invoice_history', JSON.stringify(records));
+  renderHistory(records);
 }
 
 // --- 渲染 ---
