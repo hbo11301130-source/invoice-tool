@@ -589,11 +589,15 @@ async function doSync() {
 // 初始化：从云端拉取并合并到本地
 (async function initCloud() {
   try {
-    const r = await fetch(`https://raw.githubusercontent.com/${REPO}/main/${DATA_PATH}`);
+    const r = await fetch(`https://api.github.com/repos/${REPO}/contents/${DATA_PATH}`, {
+      headers: { Authorization: `token ${PAT}`, Accept: 'application/vnd.github+json' }
+    });
     if (r.ok) {
-      const cloudData = await r.json();
+      const d = await r.json();
+      // GitHub API 返回 base64 编码的内容
+      const raw = decodeURIComponent(escape(atob(d.content.replace(/\s/g, ''))));
+      const cloudData = JSON.parse(raw);
       if (Array.isArray(cloudData) && cloudData.length) {
-        // 合并去重：以云端为准，按订单号+公司名去重
         const existKeys = new Set(cloudData.map(r => r.orderNo + '|' + r.companyName).filter(k => k !== '|'));
         const localOnly = currentRecords.filter(r => !existKeys.has(r.orderNo + '|' + r.companyName));
         currentRecords = [...cloudData, ...localOnly];
