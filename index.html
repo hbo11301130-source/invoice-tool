@@ -276,7 +276,17 @@ tbody tr:hover { background: #fafbfc; }
   <div class="section-counter" id="counter"></div>
   <div class="btn-row" id="exportRow" style="display:none">
     <button class="btn btn-outline" onclick="copyAll()">📋 复制全部</button>
-    <button class="btn btn-outline" onclick="exportCSV()">📥 导出 CSV</button>
+    <button class="btn btn-outline" onclick="exportCSV()">📥 CSV</button>
+    <button class="btn btn-outline" onclick="exportJSON()">📤 备份</button>
+    <button class="btn btn-outline" id="importBtn" onclick="document.getElementById('importFile').click()">📥 恢复</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
+    <button class="btn btn-outline" onclick="cloudSave()">☁ 上传云端</button>
+    <button class="btn btn-outline" onclick="cloudLoad()">☁ 下载云端</button>
+  </div>
+  <div id="tokenBox" style="display:none;margin-top:8px">
+    <input id="patInput" type="password" placeholder="粘贴 GitHub Token" style="width:70%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+    <button class="btn btn-primary" style="padding:8px 12px;font-size:13px;flex:none" onclick="savePAT()">保存</button>
+    <div style="font-size:11px;color:#888;margin-top:4px">去 github.com/settings/tokens 创建，勾选 repo</div>
   </div>
 </div>
 
@@ -548,6 +558,113 @@ function copyNetUrl() {
     copyText(window._netUrl);
   }
 }
+
+// --- 导出 / 导入 ---
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(currentRecords, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `开票数据_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('✅ 备份已下载');
+}
+
+function importJSON(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!Array.isArray(data)) throw new Error('格式错误');
+      currentRecords = [...currentRecords, ...data];
+      renderTable(currentRecords);
+      saveHistory(currentRecords);
+      toast(`✅ 已导入 ${data.length} 条`);
+    } catch(err) {
+      toast('❌ 文件格式错误');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+// --- GitHub 云同步 ---
+const REPO = 'hbo11301130-source/invoice-tool';
+const DATA_PATH = 'data.json';
+
+function getPAT() { return localStorage.getItem('github_pat') || ''; }
+function savePAT() {
+  const val = document.getElementById('patInput').value.trim();
+  if (!val) return toast('请输入 Token');
+  localStorage.setItem('github_pat', val);
+  document.getElementById('tokenBox').style.display = 'none';
+  toast('Token 已保存');
+  cloudSave();
+}
+
+async function cloudSave() {
+  const pat = getPAT();
+  if (!pat) { document.getElementById('tokenBox').style.display = 'block'; return toast('请先粘贴 GitHub Token'); }
+  const content = JSON.stringify(currentRecords);
+  const b64 = btoa(unescape(encodeURIComponent(content)));
+  
+  // 先获取文件 SHA（如果存在）
+  let sha = '';
+  try {
+    const getResp = await fetch(`https://api.github.com/repos/${REPO}/contents/${DATA_PATH}`, {
+      headers: { Authorization: `token ${pat}`, Accept: 'application/vnd.github+json' }
+    });
+    if (getResp.ok) { const d = await getResp.json(); sha = d.sha || ''; }
+  } catch(e) {}
+
+  const body = JSON.stringify({ message: 'Sync data', content: b64, ...(sha ? { sha } : {}) });
+  const resp = await fetch(`https://api.github.com/repos/${REPO}/contents/${DATA_PATH}`, {
+    method: 'PUT',
+    headers: { Authorization: `token ${pat}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+    body
+  });
+  if (resp.ok) {
+    toast('☁ 已上传到云端');
+  } else {
+    const err = await resp.json();
+    toast('❌ 上传失败: ' + (err.message || '请检查 Token'));
+    if (resp.status === 401) { localStorage.removeItem('github_pat'); document.getElementById('tokenBox').style.display = 'block'; }
+  }
+}
+
+async function cloudLoad() {
+  try {
+    const resp = await fetch(`https://raw.githubusercontent.com/${REPO}/main/${DATA_PATH}`);
+    if (!resp.ok) return toast('云端暂无数据');
+    const data = await resp.json();
+    if (!Array.isArray(data)) return toast('云端数据格式错误');
+    currentRecords = data;
+    renderTable(currentRecords);
+    saveHistory(currentRecords);
+    toast(`☁ 已下载 ${data.length} 条`);
+  } catch(e) {
+    toast('下载失败，请检查网络');
+  }
+}
+
+// 初始化：尝试从云端加载
+(async function initCloud() {
+  if (!currentRecords.length) {
+    try {
+      const resp = await fetch(`https://raw.githubusercontent.com/${REPO}/main/${DATA_PATH}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data) && data.length) {
+          currentRecords = data;
+          renderTable(currentRecords);
+          saveHistory(currentRecords);
+        }
+      }
+    } catch(e) {}
+  }
+})();
 </script>
 </body>
 </html>
