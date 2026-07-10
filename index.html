@@ -560,14 +560,17 @@ const DATA_PATH = 'data.json';
 const PAT = 'ghp_86N3mA' + 'QGX8Etr0K5bY3hPF2FHKKCA81H1v6Y';
 
 let _syncTimer = null;
+let _syncBusy = false;
 function autoSync() {
   clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(doSync, 800); // 防抖：800ms 内多次操作只传一次
+  _syncTimer = setTimeout(doSync, 800);
 }
 
 async function doSync() {
+  if (_syncBusy) return;
+  _syncBusy = true;
   const content = JSON.stringify(currentRecords);
-  const b64 = btoa(unescape(encodeURIComponent(content)));
+      const b64 = btoa(String.fromCharCode(...new TextEncoder().encode(content)));
   let sha = '';
   try {
     const r = await fetch(`https://api.github.com/repos/${REPO}/contents/${DATA_PATH}`, {
@@ -581,24 +584,26 @@ async function doSync() {
     headers: { Authorization: `token ${PAT}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
     body
   }).catch(()=>{});
+  _syncBusy = false;
 }
 
-// 初始化：云端有数据就拉下来
+// 初始化：从云端拉取并合并到本地
 (async function initCloud() {
-  if (!currentRecords.length) {
-    try {
-      const r = await fetch(`https://raw.githubusercontent.com/${REPO}/main/${DATA_PATH}`);
-      if (r.ok) {
-        const data = await r.json();
-        if (Array.isArray(data) && data.length) {
-          currentRecords = data;
-          renderTable(currentRecords);
-          saveHistory(currentRecords);
-          toast(`☁ 已同步 ${data.length} 条`);
-        }
+  try {
+    const r = await fetch(`https://raw.githubusercontent.com/${REPO}/main/${DATA_PATH}`);
+    if (r.ok) {
+      const cloudData = await r.json();
+      if (Array.isArray(cloudData) && cloudData.length) {
+        // 合并去重：以云端为准，按订单号+公司名去重
+        const existKeys = new Set(cloudData.map(r => r.orderNo + '|' + r.companyName).filter(k => k !== '|'));
+        const localOnly = currentRecords.filter(r => !existKeys.has(r.orderNo + '|' + r.companyName));
+        currentRecords = [...cloudData, ...localOnly];
+        renderTable(currentRecords);
+        saveHistory(currentRecords);
+        if (cloudData.length > 0) toast(`☁ 已同步 ${currentRecords.length} 条`);
       }
-    } catch(e) {}
-  }
+    }
+  } catch(e) {}
 })();
 </script>
 </body>
