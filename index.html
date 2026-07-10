@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="开票整理">
+<meta name="theme-color" content="#4a90d9">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
+<link rel="manifest" href="manifest.json">
+<title>开票信息整理工具</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #f5f5f5;
+  min-height: 100vh;
+  padding: 16px;
+}
+.header {
+  text-align: center;
+  padding: 12px 0 8px;
+}
+.header h1 { font-size: 20px; color: #1a1a1a; }
+.header p { font-size: 13px; color: #888; margin-top: 4px; }
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.card-title .icon { font-size: 18px; }
+
+textarea {
+  width: 100%;
+  min-height: 160px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #333;
+  background: #fafafa;
+  resize: vertical;
+  font-family: inherit;
+  transition: border-color .2s;
+}
+textarea:focus { outline: none; border-color: #4a90d9; background: #fff; }
+
+.btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.btn {
+  flex: 1;
+  min-width: 80px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all .2s;
+  text-align: center;
+  white-space: nowrap;
+}
+.btn-primary { background: #4a90d9; color: #fff; }
+.btn-primary:hover { background: #3a7bc8; }
+.btn-primary:active { transform: scale(.97); }
+.btn-outline { background: #fff; color: #4a90d9; border: 1.5px solid #4a90d9; }
+.btn-outline:hover { background: #f0f6ff; }
+.btn-danger { background: #fff; color: #e74c3c; border: 1.5px solid #e74c3c; }
+.btn-danger:hover { background: #fff5f5; }
+
+/* 表格样式 */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -16px;
+  padding: 0 16px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 600px;
+}
+thead th {
+  background: #f8f9fb;
+  color: #555;
+  font-weight: 600;
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 2px solid #e8e8e8;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+}
+tbody td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  color: #333;
+  vertical-align: top;
+  word-break: break-all;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: #fafbfc; }
+
+.copy-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.copy-btn {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  font-size: 11px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fafafa;
+  color: #666;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.copy-btn:active { background: #e8e8e8; }
+.copy-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 14px;
+  z-index: 999;
+  opacity: 0;
+  transition: opacity .3s;
+  pointer-events: none;
+}
+.copy-toast.show { opacity: 1; }
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #bbb;
+}
+.empty-state .icon { font-size: 40px; margin-bottom: 10px; }
+
+.section-counter {
+  font-size: 12px;
+  color: #999;
+  margin-top: 8px;
+  text-align: right;
+}
+
+/* 提示条 */
+.tip-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #888;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #fffbe6;
+  border-radius: 8px;
+  border: 1px solid #ffedb3;
+}
+.tip-bar .icon { font-size: 15px; }
+
+/* 历史记录标签 */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.tag {
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 14px;
+  background: #f0f0f0;
+  color: #666;
+  border: none;
+  cursor: pointer;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tag:active { background: #e0e0e0; }
+
+@media (max-width: 400px) {
+  body { padding: 10px; }
+  .card { padding: 12px; }
+  textarea { min-height: 140px; font-size: 14px; }
+  .btn { padding: 10px; font-size: 14px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🧾 开票信息整理</h1>
+  <p>粘贴原始开票信息 → 自动解析到表格</p>
+</div>
+<div id="networkBar" style="display:none;background:#e8f4fd;border-radius:10px;padding:10px 14px;margin-bottom:12px;text-align:center;font-size:13px;color:#3a7bc8;">
+  📱 手机访问：<b id="netUrl"></b> &nbsp;<button onclick="copyNetUrl()" style="background:#4a90d9;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;">复制链接</button>
+  <br><span style="font-size:11px;color:#999;">手机和电脑需在同一WiFi下</span>
+</div>
+
+<!-- 输入区 -->
+<div class="card">
+  <div class="card-title"><span class="icon">📋</span> 粘贴开票信息</div>
+  <textarea id="input" placeholder="粘贴示例：
+
+260612-169334618513708
+申请发票
+发票类型 增值税电子普通发票
+抬头类型 企业
+发票抬头 深圳米几文化传媒有限公司
+企业税号 91440300MAKBE36145
+商品：玩偶 金额：311.6
+
+---（用 --- 分隔多条）---"></textarea>
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="doParse()">🔍 解析填充</button>
+    <button class="btn btn-outline" onclick="doClear()">🗑 清空</button>
+  </div>
+  <div class="tip-bar">
+    <span class="icon">💡</span> 多条发票用 <b>---</b> 分隔，复制表格单元格点击对应按钮即可
+  </div>
+</div>
+
+<!-- 表格区 -->
+<div class="card" id="tableCard">
+  <div class="card-title"><span class="icon">📊</span> 开票信息表格</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>序号</th>
+          <th>订单号</th>
+          <th>发票类型</th>
+          <th>抬头类型</th>
+          <th>发票抬头</th>
+          <th>企业税号</th>
+          <th>商品</th>
+          <th>金额</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+      </tbody>
+    </table>
+  </div>
+  <div class="empty-state" id="emptyState">
+    <div class="icon">📭</div>
+    <p>暂无数据，请粘贴信息后点击解析</p>
+  </div>
+  <div class="section-counter" id="counter"></div>
+  <div class="btn-row" id="exportRow" style="display:none">
+    <button class="btn btn-outline" onclick="copyAll()">📋 复制全部</button>
+    <button class="btn btn-outline" onclick="exportCSV()">📥 导出 CSV</button>
+  </div>
+</div>
+
+<!-- 历史记录 -->
+<div class="card" id="historyCard" style="display:none">
+  <div class="card-title"><span class="icon">🕓</span> 最近解析</div>
+  <div class="tags" id="historyTags"></div>
+</div>
+
+<div class="copy-toast" id="toast"></div>
+
+<script>
+// --- 解析引擎 ---
+function parseInvoice(text) {
+  const fields = {
+    orderNo: '',
+    invoiceType: '',
+    titleType: '',
+    companyName: '',
+    taxNo: '',
+    goods: '',
+    amount: ''
+  };
+
+  // 订单号：纯数字或带-的长串
+  const orderMatch = text.match(/(\d{6,}[-]?\d*)/);
+  if (orderMatch) fields.orderNo = orderMatch[1].trim();
+
+  // 发票类型（支持冒号或空格分隔）
+  const invTypeMatch = text.match(/发票类型[：:\s]+(.+?)(?:\n|$)/m);
+  if (invTypeMatch) fields.invoiceType = invTypeMatch[1].trim();
+
+  // 抬头类型
+  const ttMatch = text.match(/抬头类型[：:\s]+(.+?)(?:\n|$)/m);
+  if (ttMatch) fields.titleType = ttMatch[1].trim();
+
+  // 发票抬头 / 公司名称（多行，直到遇到下一个字段或税号）
+  const companyMatch = text.match(/(?:发票抬头|公司名称|单位名称)[：:\s]+(.+?)(?:\n|$)/m);
+  if (companyMatch) fields.companyName = companyMatch[1].trim();
+
+  // 税号（支持冒号、空格分隔，匹配15-20位数字字母）
+  const taxMatch = text.match(/(?:企业税号|纳税人识别号|税号|统一社会信用代码)[：:\s]+([A-Za-z0-9]{15,20})/m);
+  if (taxMatch) fields.taxNo = taxMatch[1].trim();
+
+  // 商品（同一行可能有"商品：XX 金额：YY"，只取商品部分）
+  const goodsMatch = text.match(/商品[：:\s]+(.+?)(?:\s*金额[：:]|\n|$)/m);
+  if (goodsMatch) fields.goods = goodsMatch[1].trim();
+  // 也尝试匹配"货物""服务"
+  if (!fields.goods) {
+    const gm2 = text.match(/(?:货物|服务名称|项目)[：:\s]+(.+?)(?:\s*金额[：:]|\n|$)/m);
+    if (gm2) fields.goods = gm2[1].trim();
+  }
+
+  // 金额
+  const amtMatch = text.match(/(?:金额|价税合计|合计金额)[：:\s]+([\d,.]+)/m);
+  if (amtMatch) fields.amount = amtMatch[1].trim();
+
+  return fields;
+}
+
+// --- 本地存储 ---
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem('invoice_history') || '[]'); }
+  catch(e) { return []; }
+}
+function saveHistory(records) {
+  const arr = records.slice(-20);
+  localStorage.setItem('invoice_history', JSON.stringify(arr));
+  renderHistory(arr);
+}
+
+// --- 渲染 ---
+let currentRecords = loadHistory();
+
+function renderTable(records) {
+  const tbody = document.getElementById('tableBody');
+  const empty = document.getElementById('emptyState');
+  const counter = document.getElementById('counter');
+  const exportRow = document.getElementById('exportRow');
+
+  if (!records.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    counter.textContent = '';
+    exportRow.style.display = 'none';
+    return;
+  }
+
+  empty.style.display = 'none';
+  exportRow.style.display = 'flex';
+  counter.textContent = `共 ${records.length} 条记录`;
+
+  tbody.innerHTML = records.map((r, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><div class="copy-cell">${esc(r.orderNo)}<button class="copy-btn" onclick="copyText('${escAttr(r.orderNo)}')">复制</button></div></td>
+      <td>${esc(r.invoiceType)}</td>
+      <td>${esc(r.titleType)}</td>
+      <td><div class="copy-cell">${esc(r.companyName)}<button class="copy-btn" onclick="copyText('${escAttr(r.companyName)}')">复制</button></div></td>
+      <td><div class="copy-cell">${esc(r.taxNo)}<button class="copy-btn" onclick="copyText('${escAttr(r.taxNo)}')">复制</button></div></td>
+      <td>${esc(r.goods)}</td>
+      <td>${esc(r.amount)}</td>
+      <td><button class="copy-btn" style="color:#e74c3c;border-color:#e74c3c;" onclick="deleteRow(${i})">删除</button></td>
+    </tr>
+  `).join('');
+}
+
+function renderHistory(records) {
+  const card = document.getElementById('historyCard');
+  const tags = document.getElementById('historyTags');
+  if (!records.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  // 显示最近公司名作为标签
+  const names = [...new Set(records.map(r => r.companyName).filter(Boolean))];
+  tags.innerHTML = names.slice(0, 10).map(n => 
+    `<button class="tag" title="${escAttr(n)}">${esc(n)}</button>`
+  ).join('');
+}
+
+function esc(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s) { return (s || '').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+
+// --- 操作 ---
+function doParse() {
+  const raw = document.getElementById('input').value.trim();
+  if (!raw) return toast('请先粘贴开票信息');
+
+  // 按 --- 分割多条
+  const blocks = raw.split(/\n\s*---+\s*\n|\n{2,}---+\n{2,}|\n{3,}/).filter(b => b.trim());
+  
+  const newRecords = [];
+  for (const block of blocks) {
+    const trimmed = block.trim();
+    if (!trimmed) continue;
+    const parsed = parseInvoice(trimmed);
+    // 只要有订单号或公司名就认为是有效记录
+    if (parsed.orderNo || parsed.companyName) {
+      newRecords.push(parsed);
+    }
+  }
+
+  if (!newRecords.length) {
+    return toast('未能解析到开票信息，请检查格式');
+  }
+
+  currentRecords = [...currentRecords, ...newRecords];
+  renderTable(currentRecords);
+  saveHistory(currentRecords);
+  toast(`✅ 已解析 ${newRecords.length} 条记录`);
+}
+
+function doClear() {
+  if (currentRecords.length && !confirm('确定清空所有记录？')) return;
+  currentRecords = [];
+  document.getElementById('input').value = '';
+  renderTable(currentRecords);
+  saveHistory(currentRecords);
+  toast('已清空');
+}
+
+function deleteRow(index) {
+  currentRecords.splice(index, 1);
+  renderTable(currentRecords);
+  saveHistory(currentRecords);
+  toast('已删除');
+}
+
+function copyText(text) {
+  if (!text) return;
+  // 优先用 Clipboard API，失败则 fallback 到 execCommand
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => toast('已复制 ✓')).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  ta.style.top = '-9999px';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand('copy');
+    toast('已复制 ✓');
+  } catch(e) {
+    toast('复制失败，请长按手动复制');
+  }
+  document.body.removeChild(ta);
+}
+
+function copyAll() {
+  const lines = currentRecords.map((r,i) => 
+    [i+1, r.orderNo, r.invoiceType, r.titleType, r.companyName, r.taxNo, r.goods, r.amount].join('\t')
+  );
+  const text = ['序号\t订单号\t发票类型\t抬头类型\t发票抬头\t企业税号\t商品\t金额', ...lines].join('\n');
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => toast('已复制全部数据（可用 Excel 粘贴）'));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function exportCSV() {
+  const BOM = '\uFEFF';
+  const lines = currentRecords.map((r,i) => 
+    [i+1, csvEscape(r.orderNo), csvEscape(r.invoiceType), csvEscape(r.titleType), 
+     csvEscape(r.companyName), csvEscape(r.taxNo), csvEscape(r.goods), csvEscape(r.amount)].join(',')
+  );
+  const csv = BOM + ['序号,订单号,发票类型,抬头类型,发票抬头,企业税号,商品,金额', ...lines].join('\n');
+  const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `开票信息_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('CSV 已下载');
+}
+
+function csvEscape(s) {
+  s = (s || '').replace(/"/g, '""');
+  return /[",\n]/.test(s) ? `"${s}"` : s;
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+// --- 初始化 ---
+if (currentRecords.length) {
+  renderTable(currentRecords);
+  renderHistory(currentRecords);
+}
+
+// 显示局域网地址（手机访问用）
+(function showNetworkUrl() {
+  const port = location.port || '80';
+  // 尝试通过 RTCPeerConnection 获取本地 IP
+  const pc = new RTCPeerConnection({ iceServers: [] });
+  pc.createDataChannel('');
+  pc.createOffer().then(o => pc.setLocalDescription(o));
+  pc.onicecandidate = (e) => {
+    if (!e.candidate) return;
+    const ip = e.candidate.candidate.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
+    if (ip && !ip[1].startsWith('127.') && !ip[1].startsWith('0.')) {
+      const url = 'http://' + ip[1] + ':' + port + '/index.html';
+      document.getElementById('netUrl').textContent = url;
+      document.getElementById('networkBar').style.display = 'block';
+      window._netUrl = url;
+    }
+  };
+  setTimeout(() => {
+    const bar = document.getElementById('networkBar');
+    if (!window._netUrl) { bar.style.display = 'none'; }
+  }, 3000);
+})();
+
+function copyNetUrl() {
+  if (window._netUrl) {
+    copyText(window._netUrl);
+  }
+}
+</script>
+</body>
+</html>
