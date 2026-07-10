@@ -435,6 +435,7 @@ function doParse() {
   currentRecords = [...currentRecords, ...newRecords];
   renderTable(currentRecords);
   saveHistory(currentRecords);
+  autoSync();
   toast(`✅ 已解析 ${newRecords.length} 条记录`);
 }
 
@@ -444,6 +445,7 @@ function doClear() {
   document.getElementById('input').value = '';
   renderTable(currentRecords);
   saveHistory(currentRecords);
+  autoSync();
   toast('已清空');
 }
 
@@ -451,6 +453,7 @@ function deleteRow(index) {
   currentRecords.splice(index, 1);
   renderTable(currentRecords);
   saveHistory(currentRecords);
+  autoSync();
   toast('已删除');
 }
 
@@ -581,6 +584,7 @@ function importJSON(e) {
       currentRecords = [...currentRecords, ...data];
       renderTable(currentRecords);
       saveHistory(currentRecords);
+      autoSync();
       toast(`✅ 已导入 ${data.length} 条`);
     } catch(err) {
       toast('❌ 文件格式错误');
@@ -604,9 +608,19 @@ function savePAT() {
   cloudSave();
 }
 
-async function cloudSave() {
+// 自动同步：有 PAT 就后台静默上传
+function autoSync() {
   const pat = getPAT();
-  if (!pat) { document.getElementById('tokenBox').style.display = 'block'; return toast('请先粘贴 GitHub Token'); }
+  if (!pat) return; // 没配 Token 就跳过
+  cloudSave(true);
+}
+
+async function cloudSave(silent) {
+  const pat = getPAT();
+  if (!pat) {
+    if (!silent) { document.getElementById('tokenBox').style.display = 'block'; toast('请先粘贴 GitHub Token'); }
+    return;
+  }
   const content = JSON.stringify(currentRecords);
   const b64 = btoa(unescape(encodeURIComponent(content)));
   
@@ -626,7 +640,7 @@ async function cloudSave() {
     body
   });
   if (resp.ok) {
-    toast('☁ 已上传到云端');
+    if (!silent) toast('☁ 已上传到云端');
   } else {
     const err = await resp.json();
     toast('❌ 上传失败: ' + (err.message || '请检查 Token'));
